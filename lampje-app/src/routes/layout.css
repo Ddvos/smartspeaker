@@ -1,3 +1,119 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* Font imports - use the weight-specific imports */
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/manrope/400.css';
+@import '@fontsource/manrope/500.css';
+@import '@fontsource/manrope/600.css';
+@import '@fontsource/manrope/700.css';
+@import '@fontsource/plus-jakarta-sans/400.css';
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/600.css';
+
+@theme {
+  /* Colors */
+  --color-background: #0a0e14;
+  --color-surface-0: #000000;
+  --color-surface-1: #0f141a;
+  --color-surface-2: #20262f;
+  --color-surface-bright: #2a3140;
+
+  --color-primary: #81ecff;
+  --color-primary-dim: #00d4ec;
+  --color-on-primary: #0a0e14;
+  --color-secondary: #ff7520;
+  --color-on-secondary: #0a0e14;
+  --color-tertiary: #a68cff;
+  --color-on-tertiary: #0a0e14;
+  --color-error: #ff716c;
+  --color-error-container: rgba(255, 113, 108, 0.15);
+
+  --color-on-bg: #f1f3fc;
+  --color-on-bg-dim: #a0a6b8;
+  --color-on-bg-muted: #6b7280;
+  --color-outline-variant: rgba(241, 243, 252, 0.15);
+
+  /* Fonts */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-label: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  /* Radius */
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Shadows (luminous glows, not drop shadows) */
+  --shadow-glow-sm: 0 0 12px 0 rgba(129, 236, 255, 0.08);
+  --shadow-glow-md: 0 0 24px 0 rgba(129, 236, 255, 0.12);
+  --shadow-glow-lg: 0 0 48px 0 rgba(129, 236, 255, 0.16);
+  --shadow-glow-secondary: 0 0 24px 0 rgba(255, 117, 32, 0.12);
+  --shadow-glow-tertiary: 0 0 24px 0 rgba(166, 140, 255, 0.12);
+  --shadow-glow-error: 0 0 24px 0 rgba(255, 113, 108, 0.12);
+}
+
+/* Base styles */
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-background);
+    color: var(--color-on-bg);
+    font-family: var(--font-body);
+  }
+
+  ::selection {
+    background-color: rgba(129, 236, 255, 0.2);
+    color: var(--color-on-bg);
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-surface-2); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-surface-bright); }
+}
+
+/* Keyframe animations */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px 0 rgba(129, 236, 255, 0.15); }
+  50% { box-shadow: 0 0 40px 8px rgba(129, 236, 255, 0.3); }
+}
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes orb-listening {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(129, 236, 255, 0.3); }
+  50% { transform: scale(1.05); box-shadow: 0 0 60px rgba(129, 236, 255, 0.5); }
+}
+
+@keyframes orb-thinking-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dots-loading {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}

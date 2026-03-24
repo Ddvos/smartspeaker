@@ -42,5 +42,11 @@
 		"onlyBuiltDependencies": [
 			"esbuild"
 		]
+	},
+	"dependencies": {
+		"@fontsource/manrope": "^5.2.8",
+		"@fontsource/plus-jakarta-sans": "^5.2.8",
+		"@fontsource/space-grotesk": "^5.2.10",
+		"lucide-svelte": "^1.0.1"
 	}
 }
