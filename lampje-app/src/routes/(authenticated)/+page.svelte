@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { mockStats } from '$lib/data/mock-dashboard';
   import GreetingHeader from '$lib/components/dashboard/GreetingHeader.svelte';
   import ActivityChart from '$lib/components/dashboard/ActivityChart.svelte';
@@ -15,7 +16,7 @@
 <div class="space-y-6 lg:space-y-0 lg:flex lg:gap-8">
   <!-- Main column -->
   <div class="flex-1 min-w-0 space-y-6">
-    <GreetingHeader />
+    <GreetingHeader userName={page.data.session?.user?.name ?? 'daar'} />
     <SearchBar placeholder="Doorzoek je gesprekken, kennis, en herinneringen..." showShortcut={true} />
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {#each mockStats as stat, i}
