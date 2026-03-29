@@ -1,4 +1,5 @@
 idf_component_register(
+    EMBED_FILES "coldplay.pcm"
     SRCS
         "main.c"
         "wifi_manager.c"
@@ -8,12 +9,22 @@ idf_component_register(
         "display_ui.c"
         "audio_codecs.c"
         "config_store.c"
+        "gemini_client.c"
     INCLUDE_DIRS "."
     REQUIRES
         nvs_flash
         esp_wifi
         esp_http_client
+        esp-tls
         esp_lcd
         driver
-        json
+        cjson
+        esp_timer
+        esp_driver_gpio
+        esp_driver_ledc
+        esp_driver_i2c
+        esp_driver_i2s
+        esp_websocket_client
+        mbedtls
+        esp_ringbuf
 )

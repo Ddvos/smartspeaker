@@ -1,12 +1,17 @@
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
 #include "device_manager.h"
 #include "config_store.h"
 #include "api_client.h"
 #include "wifi_manager.h"
 #include "display_ui.h"
+#include "gemini_client.h"
+#include "audio_codecs.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "lvgl.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -63,10 +68,9 @@ static void refresh_pairing_code(void)
     }
 }
 
-static bool check_if_paired(void)
+// Returns: 1 = paired, 0 = not paired, -1 = unauthorized (credentials invalid)
+static int check_if_paired(void)
 {
-    // Send a heartbeat — if the device has been paired, the server will accept it
-    // and we can transition to the running state
     heartbeat_response_t resp = {0};
     char ip[16] = {0};
     wifi_manager_get_ip_str(ip, sizeof(ip));
@@ -74,7 +78,133 @@ static bool check_if_paired(void)
 
     esp_err_t err = api_send_heartbeat(s_device_id, s_device_token,
                                         rssi, ip, FIRMWARE_VERSION, &resp);
-    return (err == ESP_OK);
+    if (err != ESP_OK && resp.http_status == 401) {
+        return -1;
+    }
+    return (err == ESP_OK && resp.paired) ? 1 : 0;
+}
+
+static bool s_gemini_connected = false;
+static int64_t s_token_fetched_epoch = 0;
+
+// Pending UI update (set from WS task, processed in device_manager task)
+static volatile gemini_state_t s_pending_ui_state = GEMINI_STATE_IDLE;
+static volatile bool s_ui_update_pending = false;
+
+static void register_touch_handler(void);
+
+// Called from WebSocket task — do NOT call LVGL here (not thread-safe)
+static void on_gemini_state_change(gemini_state_t state)
+{
+    s_pending_ui_state = state;
+    s_ui_update_pending = true;
+
+    // Update non-LVGL state immediately
+    switch (state) {
+        case GEMINI_STATE_READY:
+            s_state = DEVICE_STATE_VOICE_READY;
+            break;
+        case GEMINI_STATE_LISTENING:
+            s_state = DEVICE_STATE_VOICE_ACTIVE;
+            break;
+        case GEMINI_STATE_DISCONNECTED:
+        case GEMINI_STATE_ERROR:
+            s_state = DEVICE_STATE_RUNNING;
+            s_gemini_connected = false;
+            ESP_LOGW(TAG, "Gemini disconnected/error");
+            break;
+        default:
+            break;
+    }
+}
+
+// Process pending UI updates (called from device_manager task — safe for LVGL)
+static void process_ui_updates(void)
+{
+    if (!s_ui_update_pending) return;
+    s_ui_update_pending = false;
+
+    gemini_state_t state = s_pending_ui_state;
+    switch (state) {
+        case GEMINI_STATE_READY:
+            display_ui_show_voice_idle();
+            register_touch_handler();
+            break;
+        case GEMINI_STATE_LISTENING:
+            display_ui_show_voice_listening();
+            register_touch_handler();
+            break;
+        case GEMINI_STATE_PROCESSING:
+            display_ui_show_voice_thinking();
+            register_touch_handler();
+            break;
+        case GEMINI_STATE_SPEAKING:
+            display_ui_show_voice_speaking();
+            register_touch_handler();
+            break;
+        default:
+            break;
+    }
+}
+
+static void touch_event_cb(lv_event_t *e)
+{
+    gemini_state_t gs = gemini_client_get_state();
+    ESP_LOGI(TAG, "Touch! Gemini state=%d", gs);
+
+    if (gs == GEMINI_STATE_READY) {
+        // Start conversation (tap once to begin)
+        audio_codecs_stop_music();
+        gemini_client_start_turn();
+    } else if (gs == GEMINI_STATE_LISTENING || gs == GEMINI_STATE_SPEAKING ||
+               gs == GEMINI_STATE_PROCESSING) {
+        // Stop conversation (tap again to stop, from any active state)
+        gemini_client_end_turn();
+    }
+}
+
+static esp_err_t connect_gemini(void)
+{
+    s_state = DEVICE_STATE_VOICE_CONNECTING;
+    display_ui_show_voice_connecting();
+
+    gemini_token_response_t token_resp = {0};
+    esp_err_t err = api_get_gemini_token(s_device_id, s_device_token, &token_resp);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get Gemini token");
+        return err;
+    }
+
+    gemini_client_init(on_gemini_state_change);
+
+    gemini_config_t gcfg = {0};
+    strncpy(gcfg.token, token_resp.gemini_token, sizeof(gcfg.token) - 1);
+    strncpy(gcfg.model, token_resp.model, sizeof(gcfg.model) - 1);
+    strncpy(gcfg.voice, token_resp.voice, sizeof(gcfg.voice) - 1);
+    strncpy(gcfg.system_prompt, token_resp.system_prompt, sizeof(gcfg.system_prompt) - 1);
+    gcfg.speaker_volume = token_resp.speaker_volume;
+    gcfg.mic_sensitivity = token_resp.mic_sensitivity;
+
+    err = gemini_client_connect(&gcfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Gemini connection failed");
+        return err;
+    }
+
+    s_gemini_connected = true;
+    s_token_fetched_epoch = esp_log_timestamp() / 1000;
+    ESP_LOGI(TAG, "Gemini connected, voice ready");
+    return ESP_OK;
+}
+
+static void register_touch_handler(void)
+{
+    // Get current screen and register touch callback
+    lv_obj_t *scr = lv_screen_active();
+    if (scr) {
+        lv_obj_add_event_cb(scr, touch_event_cb, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
+    }
 }
 
 static void heartbeat_loop(void)
@@ -85,17 +215,29 @@ static void heartbeat_loop(void)
     device_config_t config = {0};
     if (api_get_config(s_device_id, s_device_token, &config) == ESP_OK) {
         config_store_save_config(&config);
-        // TODO: Apply config (LED colors, volume, brightness)
+        audio_codecs_set_volume(config.speaker_volume);
     }
 
-    // Show status screen
-    display_ui_show_status("Lampje", true, wifi_manager_get_rssi());
+    // Connect to Gemini
+    if (connect_gemini() != ESP_OK) {
+        ESP_LOGW(TAG, "Gemini connect failed, will retry");
+        display_ui_show_status("Lampje", true, wifi_manager_get_rssi());
+    }
+    register_touch_handler();
 
+    int heartbeat_counter = 0;
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(HEARTBEAT_INTERVAL_MS));
+        // Poll UI updates quickly (every 100ms)
+        vTaskDelay(pdMS_TO_TICKS(100));
+        process_ui_updates();
+
+        // Heartbeat every 30 seconds (300 * 100ms)
+        if (++heartbeat_counter < 300) {
+            continue;
+        }
+        heartbeat_counter = 0;
 
         if (!wifi_manager_is_connected()) {
-            display_ui_show_status("Lampje", false, 0);
             continue;
         }
 
@@ -108,7 +250,6 @@ static void heartbeat_loop(void)
                                             rssi, ip, FIRMWARE_VERSION, &resp);
 
         if (err == ESP_OK) {
-            // Check if config was updated on server
             if (resp.config_updated_at[0] != '\0' &&
                 strcmp(resp.config_updated_at, s_last_config_updated) != 0) {
                 ESP_LOGI(TAG, "Config changed on server, fetching...");
@@ -117,13 +258,27 @@ static void heartbeat_loop(void)
                     config_store_save_config(&new_config);
                     strncpy(s_last_config_updated, resp.config_updated_at,
                             sizeof(s_last_config_updated) - 1);
-                    // TODO: Apply new config to hardware
+                    audio_codecs_set_volume(new_config.speaker_volume);
                 }
             }
+        }
 
-            display_ui_show_status("Lampje", true, rssi);
-        } else {
-            ESP_LOGW(TAG, "Heartbeat failed");
+        // Retry Gemini connection if disconnected
+        if (!s_gemini_connected) {
+            ESP_LOGI(TAG, "Retrying Gemini connection...");
+            if (connect_gemini() == ESP_OK) {
+                register_touch_handler();
+            }
+        }
+
+        // Refresh Gemini token every 25 minutes (token valid for 30 min)
+        int64_t now_sec = esp_log_timestamp() / 1000;
+        if (s_gemini_connected && (now_sec - s_token_fetched_epoch) > (25 * 60)) {
+            ESP_LOGI(TAG, "Refreshing Gemini token...");
+            gemini_client_disconnect();
+            if (connect_gemini() == ESP_OK) {
+                register_touch_handler();
+            }
         }
     }
 }
@@ -139,15 +294,24 @@ static void device_manager_task(void *arg)
         strncpy(s_device_id, creds.device_id, sizeof(s_device_id) - 1);
         strncpy(s_device_token, creds.device_token, sizeof(s_device_token) - 1);
 
-        // Try a heartbeat to see if we're paired
-        if (check_if_paired()) {
+        int paired = check_if_paired();
+        if (paired == 1) {
             heartbeat_loop();  // Does not return
+        } else if (paired == -1) {
+            // Credentials rejected — clear and re-register
+            ESP_LOGW(TAG, "Credentials rejected (401), re-registering...");
+            config_store_clear();
+            memset(s_device_id, 0, sizeof(s_device_id));
+            memset(s_device_token, 0, sizeof(s_device_token));
+            creds.has_credentials = false;
+        } else {
+            // Not paired yet, show pairing code
+            s_state = DEVICE_STATE_PAIRING;
+            refresh_pairing_code();
         }
+    }
 
-        // Not paired yet, show pairing code
-        s_state = DEVICE_STATE_PAIRING;
-        refresh_pairing_code();
-    } else {
+    if (!creds.has_credentials) {
         // No credentials — register as new device
         esp_err_t err = do_register();
         if (err != ESP_OK) {
@@ -170,9 +334,14 @@ static void device_manager_task(void *arg)
             pairing_elapsed_ms = 0;
         }
 
-        if (check_if_paired()) {
+        int paired = check_if_paired();
+        if (paired == 1) {
             ESP_LOGI(TAG, "Device paired! Entering heartbeat loop.");
             heartbeat_loop();  // Does not return
+        } else if (paired == -1) {
+            ESP_LOGW(TAG, "Credentials rejected during pairing, restarting...");
+            config_store_clear();
+            esp_restart();
         }
     }
 
