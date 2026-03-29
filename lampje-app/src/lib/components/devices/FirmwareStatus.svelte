@@ -1,10 +1,25 @@
 <script lang="ts">
-  const firmwareInfo = [
-    { label: 'Firmware versie', value: 'Niet beschikbaar' },
-    { label: 'Laatst gezien', value: 'Nooit' },
-    { label: 'WiFi signaal', value: '\u2014' },
-    { label: 'Batterij', value: '\u2014' }
-  ];
+  import type { Device } from '$lib/types';
+  import { formatRelativeTime, formatWifiRssi } from '$lib/utils/formatters';
+
+  let { device }: { device: Device } = $props();
+
+  const firmwareInfo = $derived([
+    {
+      label: 'Firmware versie',
+      value: device.firmwareVersion ?? 'Niet beschikbaar'
+    },
+    {
+      label: 'Laatst gezien',
+      value: device.lastHeartbeat
+        ? formatRelativeTime(new Date(device.lastHeartbeat))
+        : 'Nooit'
+    },
+    {
+      label: 'WiFi signaal',
+      value: formatWifiRssi(device.wifiRssi)
+    }
+  ]);
 </script>
 
 <div class="rounded-xl bg-surface-2 p-6">
