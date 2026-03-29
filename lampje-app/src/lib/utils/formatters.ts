@@ -34,3 +34,11 @@ export function formatDateFull(date: Date): string {
 		year: 'numeric'
 	});
 }
+
+export function formatWifiRssi(rssi: number | null): string {
+	if (rssi === null) return 'Geen verbinding';
+	if (rssi >= -50) return `Uitstekend (${rssi} dBm)`;
+	if (rssi >= -60) return `Goed (${rssi} dBm)`;
+	if (rssi >= -70) return `Redelijk (${rssi} dBm)`;
+	return `Zwak (${rssi} dBm)`;
+}

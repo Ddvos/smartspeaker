@@ -11,6 +11,9 @@
   import ApiStatus from '$lib/components/dashboard/ApiStatus.svelte';
   import SearchBar from '$lib/components/ui/SearchBar.svelte';
   import StatCard from '$lib/components/ui/StatCard.svelte';
+  import type { Device } from '$lib/types';
+
+  const data = $derived(page.data as { primaryDevice: Device | null; session: any });
 </script>
 
 <div class="space-y-6 lg:space-y-0 lg:flex lg:gap-8">
@@ -33,7 +36,7 @@
   <!-- Right sidebar -->
   <aside class="lg:w-[340px] lg:shrink-0 space-y-4">
     <VoiceStatus />
-    <DeviceStatus />
+    <DeviceStatus device={data.primaryDevice} />
     <ConfigPreview />
     <ApiStatus />
   </aside>

@@ -1,0 +1,19 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "wifi_manager.c"
+        "api_client.c"
+        "device_manager.c"
+        "display_driver.c"
+        "display_ui.c"
+        "audio_codecs.c"
+        "config_store.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_http_client
+        esp_lcd
+        driver
+        json
+)

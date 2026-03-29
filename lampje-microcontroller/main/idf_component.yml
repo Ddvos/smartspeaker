@@ -1,0 +1,6 @@
+dependencies:
+  lvgl/lvgl: "^9"
+  espressif/esp_lcd_mipi_dsi: "*"
+  espressif/esp_wifi_remote: "*"
+  idf:
+    version: ">=5.4.0"

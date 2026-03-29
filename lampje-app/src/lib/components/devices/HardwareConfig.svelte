@@ -1,10 +1,19 @@
 <script lang="ts">
-  let ledColors = $state({
-    idle: '#6b7280',
-    listening: '#81ecff',
-    thinking: '#ff7520',
-    speaking: '#a68cff',
-    error: '#ff716c'
+  import type { DeviceConfig } from '$lib/types';
+  import { deviceStore } from '$lib/stores/devices.svelte';
+
+  let { config, deviceId }: { config: DeviceConfig; deviceId: string } = $props();
+
+  let ledColors = $state({ ...config.ledColors });
+  let micSensitivity = $state(config.micSensitivity);
+  let speakerVolume = $state(config.speakerVolume);
+  let displayBrightness = $state(config.displayBrightness);
+
+  $effect(() => {
+    ledColors = { ...config.ledColors };
+    micSensitivity = config.micSensitivity;
+    speakerVolume = config.speakerVolume;
+    displayBrightness = config.displayBrightness;
   });
 
   const ledLabels: Record<string, string> = {
@@ -15,12 +24,6 @@
     error: 'Fout'
   };
 
-  let micSensitivity = $state(50);
-  let speakerVolume = $state(75);
-  let cameraEnabled = $state(false);
-  let cameraResolution = $state('480p');
-  let cliffSensors = $state(true);
-
   const micLabel = $derived(
     micSensitivity < 33 ? 'Laag' : micSensitivity < 66 ? 'Gemiddeld' : 'Hoog'
   );
@@ -29,7 +32,23 @@
     speakerVolume < 33 ? 'Laag' : speakerVolume < 66 ? 'Gemiddeld' : 'Hoog'
   );
 
-  const resolutionOptions = ['240p', '480p', '720p'] as const;
+  const brightnessLabel = $derived(
+    displayBrightness < 33 ? 'Laag' : displayBrightness < 66 ? 'Gemiddeld' : 'Hoog'
+  );
+
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function debounceSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      deviceStore.updateConfig(deviceId, {
+        ledColors,
+        micSensitivity,
+        speakerVolume,
+        displayBrightness
+      });
+    }, 500);
+  }
 </script>
 
 <style>
@@ -94,7 +113,8 @@
             <input
               type="color"
               class="h-8 w-8 cursor-pointer rounded-lg"
-              bind:value={ledColors[key as keyof typeof ledColors]}
+              bind:value={ledColors[key]}
+              onchange={debounceSave}
             />
           </div>
         {/each}
@@ -112,6 +132,7 @@
         min="0"
         max="100"
         bind:value={micSensitivity}
+        oninput={debounceSave}
       />
     </div>
 
@@ -126,58 +147,23 @@
         min="0"
         max="100"
         bind:value={speakerVolume}
+        oninput={debounceSave}
       />
     </div>
 
-    <!-- Camera -->
+    <!-- Display Brightness -->
     <div>
-      <div class="flex items-center justify-between">
-        <span class="font-body text-sm text-on-bg">Camera</span>
-        <button
-          type="button"
-          class="relative h-6 w-11 cursor-pointer rounded-full transition-colors duration-200 {cameraEnabled ? 'bg-primary' : 'bg-surface-bright'}"
-          onclick={() => (cameraEnabled = !cameraEnabled)}
-          role="switch"
-          aria-checked={cameraEnabled}
-          aria-label="Camera aan/uit"
-        >
-          <span
-            class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-on-bg transition-transform duration-200 {cameraEnabled ? 'translate-x-5' : 'translate-x-0'}"
-          ></span>
-        </button>
+      <div class="mb-2 flex items-center justify-between">
+        <span class="font-body text-sm text-on-bg">Scherm helderheid</span>
+        <span class="font-label text-xs text-on-bg-muted">{brightnessLabel}</span>
       </div>
-
-      {#if cameraEnabled}
-        <div class="mt-3 flex items-center gap-2">
-          <span class="font-label text-xs text-on-bg-muted">Resolutie:</span>
-          {#each resolutionOptions as res}
-            <button
-              type="button"
-              class="cursor-pointer rounded-lg px-3 py-1.5 font-label text-xs transition-colors {cameraResolution === res ? 'bg-primary/10 text-primary' : 'bg-surface-bright text-on-bg-muted hover:text-on-bg-dim'}"
-              onclick={() => (cameraResolution = res)}
-            >
-              {res}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
-
-    <!-- Cliff Sensors -->
-    <div class="flex items-center justify-between">
-      <span class="font-body text-sm text-on-bg">Cliff sensoren</span>
-      <button
-        type="button"
-        class="relative h-6 w-11 cursor-pointer rounded-full transition-colors duration-200 {cliffSensors ? 'bg-primary' : 'bg-surface-bright'}"
-        onclick={() => (cliffSensors = !cliffSensors)}
-        role="switch"
-        aria-checked={cliffSensors}
-        aria-label="Cliff sensoren aan/uit"
-      >
-        <span
-          class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-on-bg transition-transform duration-200 {cliffSensors ? 'translate-x-5' : 'translate-x-0'}"
-        ></span>
-      </button>
+      <input
+        type="range"
+        min="0"
+        max="100"
+        bind:value={displayBrightness}
+        oninput={debounceSave}
+      />
     </div>
   </div>
 </div>
