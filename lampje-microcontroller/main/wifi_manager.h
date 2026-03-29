@@ -4,8 +4,8 @@
 #include <stdbool.h>
 
 // TODO: Move to NVS or provisioning screen in future
-#define WIFI_SSID       "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD   "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID       "KPND39256"
+#define WIFI_PASSWORD   "RPd4CxzvxWspVjLt"
 
 esp_err_t wifi_manager_init(void);
 bool wifi_manager_is_connected(void);

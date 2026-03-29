@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# ESP-IDF build artifacts
+lampje-microcontroller/build/
+lampje-microcontroller/managed_components/
+lampje-microcontroller/dependencies.lock
+lampje-microcontroller/sdkconfig.old
+
+# IDE
+.vscode/
+
+# Audio test files
+*.pcm
+*.mp3
+
+# Vendor hardware docs
+ESP32-P4-WIFI6-Touch-LCD-XC/

@@ -35,16 +35,18 @@ void app_main(void)
         return;
     }
 
-    // 4. Initialize audio codecs (probe only for Phase 3)
-    audio_codecs_init();
+    // 4. Initialize audio codecs (ES8311 speaker + ES7210 microphones)
+    esp_err_t audio_err = audio_codecs_init();
+    if (audio_err != ESP_OK) {
+        ESP_LOGW(TAG, "Audio init failed: %s (continuing without audio)", esp_err_to_name(audio_err));
+    }
 
     // 5. Start device manager (registration, pairing, heartbeat loop)
     ESP_ERROR_CHECK(device_manager_start());
 
-    // Main task: LVGL tick handler
-    // LVGL needs periodic timer ticks to process animations and input
+    // LVGL rendering runs in its own task (started by display_driver_init)
+    // Keep main task alive
     while (1) {
-        lv_timer_handler();
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

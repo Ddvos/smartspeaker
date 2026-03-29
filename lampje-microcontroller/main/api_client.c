@@ -1,5 +1,6 @@
 #include "api_client.h"
 #include "esp_http_client.h"
+#include "esp_tls.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
@@ -53,6 +54,8 @@ esp_err_t api_register_device(const char *chip_id, const char *firmware_version,
         .method = HTTP_METHOD_POST,
         .event_handler = http_event_handler,
         .user_data = &resp,
+        .skip_cert_common_name_check = true,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -115,6 +118,8 @@ esp_err_t api_send_heartbeat(const char *device_id, const char *token,
         .method = HTTP_METHOD_POST,
         .event_handler = http_event_handler,
         .user_data = &resp,
+        .skip_cert_common_name_check = true,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -124,10 +129,15 @@ esp_err_t api_send_heartbeat(const char *device_id, const char *token,
 
     esp_err_t err = esp_http_client_perform(client);
     int status = esp_http_client_get_status_code(client);
+    response->http_status = status;
 
     if (err == ESP_OK && status == 200) {
         cJSON *json = cJSON_Parse(resp_buf);
         if (json) {
+            cJSON *paired = cJSON_GetObjectItem(json, "paired");
+            if (paired) {
+                response->paired = cJSON_IsTrue(paired);
+            }
             cJSON *updated = cJSON_GetObjectItem(json, "configUpdatedAt");
             if (updated && updated->valuestring) {
                 strncpy(response->config_updated_at, updated->valuestring,
@@ -163,6 +173,8 @@ esp_err_t api_get_config(const char *device_id, const char *token,
         .method = HTTP_METHOD_GET,
         .event_handler = http_event_handler,
         .user_data = &resp,
+        .skip_cert_common_name_check = true,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config_http);
@@ -210,6 +222,70 @@ esp_err_t api_get_config(const char *device_id, const char *token,
     return err;
 }
 
+esp_err_t api_get_gemini_token(const char *device_id, const char *token,
+                                gemini_token_response_t *response)
+{
+    char url[256];
+    snprintf(url, sizeof(url), "%s/api/devices/%s/gemini-token", API_BASE_URL, device_id);
+
+    char auth_header[192];
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", token);
+
+    char *resp_buf = calloc(1, MAX_RESPONSE_LEN);
+    response_buffer_t resp = { .buffer = resp_buf, .len = 0, .max_len = MAX_RESPONSE_LEN };
+
+    esp_http_client_config_t config = {
+        .url = url,
+        .method = HTTP_METHOD_POST,
+        .event_handler = http_event_handler,
+        .user_data = &resp,
+        .skip_cert_common_name_check = true,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "Authorization", auth_header);
+    esp_http_client_set_post_field(client, "{}", 2);
+
+    esp_err_t err = esp_http_client_perform(client);
+    int status = esp_http_client_get_status_code(client);
+
+    if (err == ESP_OK && status == 200) {
+        cJSON *json = cJSON_Parse(resp_buf);
+        if (json) {
+            cJSON *t = cJSON_GetObjectItem(json, "token");
+            if (t && t->valuestring)
+                strncpy(response->gemini_token, t->valuestring, sizeof(response->gemini_token) - 1);
+            cJSON *m = cJSON_GetObjectItem(json, "model");
+            if (m && m->valuestring)
+                strncpy(response->model, m->valuestring, sizeof(response->model) - 1);
+            cJSON *v = cJSON_GetObjectItem(json, "voice");
+            if (v && v->valuestring)
+                strncpy(response->voice, v->valuestring, sizeof(response->voice) - 1);
+            cJSON *sp = cJSON_GetObjectItem(json, "systemPrompt");
+            if (sp && sp->valuestring)
+                strncpy(response->system_prompt, sp->valuestring, sizeof(response->system_prompt) - 1);
+            cJSON *ea = cJSON_GetObjectItem(json, "expiresAt");
+            if (ea && ea->valuestring)
+                strncpy(response->expires_at, ea->valuestring, sizeof(response->expires_at) - 1);
+            cJSON *sv = cJSON_GetObjectItem(json, "speakerVolume");
+            if (sv) response->speaker_volume = sv->valueint;
+            cJSON *ms = cJSON_GetObjectItem(json, "micSensitivity");
+            if (ms) response->mic_sensitivity = ms->valueint;
+            cJSON_Delete(json);
+            ESP_LOGI(TAG, "Gemini token fetched, model: %s", response->model);
+        }
+    } else {
+        ESP_LOGE(TAG, "Get Gemini token failed: HTTP %d", status);
+        err = ESP_FAIL;
+    }
+
+    esp_http_client_cleanup(client);
+    free(resp_buf);
+    return err;
+}
+
 esp_err_t api_refresh_pairing_code(const char *device_id, const char *token,
                                     pairing_code_response_t *response)
 {
@@ -227,6 +303,8 @@ esp_err_t api_refresh_pairing_code(const char *device_id, const char *token,
         .method = HTTP_METHOD_POST,
         .event_handler = http_event_handler,
         .user_data = &resp,
+        .skip_cert_common_name_check = true,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);

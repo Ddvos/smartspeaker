@@ -94,6 +94,8 @@ export const deviceConfigs = pgTable('device_config', {
 	speakerVolume: integer('speaker_volume').default(65).notNull(),
 	displayBrightness: integer('display_brightness').default(80).notNull(),
 	voice: text('voice').default('puck').notNull(),
+	systemPrompt: text('system_prompt'),
+	geminiModel: text('gemini_model').default('gemini-3.1-flash-live-preview').notNull(),
 	sttProvider: text('stt_provider').default('whisper').notNull(),
 	ttsProvider: text('tts_provider').default('elevenlabs').notNull(),
 	updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow()

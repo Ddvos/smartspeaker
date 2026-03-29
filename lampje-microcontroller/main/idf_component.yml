@@ -1,6 +1,9 @@
 dependencies:
   lvgl/lvgl: "^9"
-  espressif/esp_lcd_mipi_dsi: "*"
   espressif/esp_wifi_remote: "*"
+  espressif/cjson: "*"
+  espressif/esp_lcd_jd9365: "^2.0.2"
+  espressif/esp_websocket_client: "*"
+  espressif/esp_codec_dev: "^1.3.4"
   idf:
-    version: ">=5.4.0"
+    version: ">=6.0.0"

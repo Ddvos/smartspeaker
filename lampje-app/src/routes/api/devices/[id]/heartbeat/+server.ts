@@ -32,6 +32,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		.limit(1);
 
 	return json({
+		paired: device.userId !== null,
 		configUpdatedAt: config?.updatedAt?.toISOString() ?? null
 	});
 };
