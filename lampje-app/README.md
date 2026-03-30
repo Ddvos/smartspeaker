@@ -18,9 +18,32 @@ To recreate this project with the same configuration:
 pnpm dlx sv@0.12.8 create --template minimal --types ts --add prettier eslint tailwindcss="plugins:typography,forms" sveltekit-adapter="adapter:node" mcp="ide:claude-code+setup:local" --install pnpm lampje-app
 ```
 
+## Database
+
+The project uses PostgreSQL via Docker and Drizzle ORM.
+
+```sh
+# Start the Postgres container
+docker compose up -d
+
+# Run migrations
+pnpm db:migrate
+
+# Open Drizzle Studio
+pnpm db:studio
+```
+
+To start with a fresh database (wipes all data):
+
+```sh
+docker compose down -v
+docker compose up -d
+pnpm db:migrate
+```
+
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Once you've created a project and installed dependencies with `pnpm install`, start a development server:
 
 ```sh
 npm run dev

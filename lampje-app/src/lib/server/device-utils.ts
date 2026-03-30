@@ -30,6 +30,8 @@ export function formatDeviceRow(
 		speakerVolume: number;
 		displayBrightness: number;
 		voice: string;
+		systemPrompt: string | null;
+		geminiModel: string;
 		sttProvider: string;
 		ttsProvider: string;
 	}
@@ -51,6 +53,8 @@ export function formatDeviceRow(
 			speakerVolume: config.speakerVolume,
 			displayBrightness: config.displayBrightness,
 			voice: config.voice,
+			systemPrompt: config.systemPrompt,
+			geminiModel: config.geminiModel,
 			sttProvider: config.sttProvider,
 			ttsProvider: config.ttsProvider
 		}

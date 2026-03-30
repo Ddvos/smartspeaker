@@ -33,6 +33,8 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		'speakerVolume',
 		'displayBrightness',
 		'voice',
+		'systemPrompt',
+		'geminiModel',
 		'sttProvider',
 		'ttsProvider'
 	] as const;
@@ -60,6 +62,8 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		speakerVolume: updated.speakerVolume,
 		displayBrightness: updated.displayBrightness,
 		voice: updated.voice,
+		systemPrompt: updated.systemPrompt,
+		geminiModel: updated.geminiModel,
 		sttProvider: updated.sttProvider,
 		ttsProvider: updated.ttsProvider
 	});

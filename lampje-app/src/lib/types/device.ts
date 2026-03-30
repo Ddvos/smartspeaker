@@ -4,6 +4,8 @@ export interface DeviceConfig {
 	speakerVolume: number; // 0-100
 	displayBrightness: number; // 0-100
 	voice: string;
+	systemPrompt: string | null;
+	geminiModel: string;
 	sttProvider: string;
 	ttsProvider: string;
 }

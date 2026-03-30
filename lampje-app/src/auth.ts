@@ -4,6 +4,7 @@ import Apple from '@auth/sveltekit/providers/apple';
 import { DrizzleAdapter } from '@auth/drizzle-adapter';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/schema';
+import { trackEvent } from '$lib/server/posthog';
 
 export const { handle, signIn, signOut } = SvelteKitAuth({
 	adapter: DrizzleAdapter(db, {
@@ -20,6 +21,13 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
 		session({ session, user }) {
 			session.user.id = user.id;
 			return session;
+		}
+	},
+	events: {
+		createUser({ user }) {
+			if (user.id) {
+				trackEvent(user.id, 'user_signed_up');
+			}
 		}
 	},
 	trustHost: true

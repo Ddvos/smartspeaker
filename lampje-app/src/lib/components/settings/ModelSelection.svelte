@@ -1,6 +1,6 @@
 <script lang="ts">
   import { settingsStore } from '$lib/stores/settings.svelte';
-  import { mockModels } from '$lib/data/mock-settings';
+  import { models } from '$lib/data/settings-constants';
   import { Check } from 'lucide-svelte';
 </script>
 
@@ -8,8 +8,8 @@
   <h2 class="font-display text-lg text-on-bg">AI Model</h2>
 
   <div class="space-y-3 mt-4">
-    {#each mockModels as model}
-      {@const isSelected = settingsStore.current.selectedModel === model.id}
+    {#each models as model}
+      {@const isSelected = settingsStore.current.defaultModel === model.id}
       <button
         type="button"
         class="w-full text-left p-4 rounded-xl transition-all duration-150 cursor-pointer {isSelected

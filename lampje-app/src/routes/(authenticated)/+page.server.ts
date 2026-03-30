@@ -4,6 +4,18 @@ import { devices, deviceConfigs } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 import { formatDeviceRow } from '$lib/server/device-utils';
 
+const DEFAULT_CONFIG = {
+	ledColors: {},
+	micSensitivity: 70,
+	speakerVolume: 65,
+	displayBrightness: 80,
+	voice: 'puck',
+	systemPrompt: null,
+	geminiModel: 'gemini-2.0-flash-live',
+	sttProvider: 'whisper',
+	ttsProvider: 'elevenlabs'
+} as const;
+
 export const load: PageServerLoad = async (event) => {
 	const session = await event.locals.auth();
 
@@ -16,18 +28,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const primaryDevice =
 		rows.length > 0
-			? formatDeviceRow(
-					rows[0].device,
-					rows[0].device_config ?? {
-						ledColors: {},
-						micSensitivity: 70,
-						speakerVolume: 65,
-						displayBrightness: 80,
-						voice: 'puck',
-						sttProvider: 'whisper',
-						ttsProvider: 'elevenlabs'
-					}
-				)
+			? formatDeviceRow(rows[0].device, rows[0].device_config ?? DEFAULT_CONFIG)
 			: null;
 
 	return { primaryDevice };

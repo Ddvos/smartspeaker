@@ -6,6 +6,18 @@ import { eq } from 'drizzle-orm';
 import { authenticateDevice } from '$lib/server/device-auth';
 import { formatDeviceRow } from '$lib/server/device-utils';
 
+const DEFAULT_CONFIG = {
+	ledColors: {},
+	micSensitivity: 70,
+	speakerVolume: 65,
+	displayBrightness: 80,
+	voice: 'puck',
+	systemPrompt: null,
+	geminiModel: 'gemini-2.0-flash-live',
+	sttProvider: 'whisper',
+	ttsProvider: 'elevenlabs'
+} as const;
+
 export const GET: RequestHandler = async ({ params, request, locals }) => {
 	// Try session auth first, then device token
 	const session = await locals.auth();
@@ -35,14 +47,6 @@ export const GET: RequestHandler = async ({ params, request, locals }) => {
 	}
 
 	return json(
-		formatDeviceRow(row.device, row.device_config ?? {
-			ledColors: {},
-			micSensitivity: 70,
-			speakerVolume: 65,
-			displayBrightness: 80,
-			voice: 'puck',
-			sttProvider: 'whisper',
-			ttsProvider: 'elevenlabs'
-		})
+		formatDeviceRow(row.device, row.device_config ?? DEFAULT_CONFIG)
 	);
 };

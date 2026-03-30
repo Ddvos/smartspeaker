@@ -1,8 +1,12 @@
 <script lang="ts">
   import { settingsStore } from '$lib/stores/settings.svelte';
-  import { mockSettings } from '$lib/data/mock-settings';
+  import { DEFAULT_SYSTEM_PROMPT } from '$lib/data/settings-constants';
 
-  let promptValue = $state(settingsStore.current.systemPrompt);
+  let promptValue = $state(settingsStore.current.defaultSystemPrompt);
+
+  $effect(() => {
+    promptValue = settingsStore.current.defaultSystemPrompt;
+  });
 
   function handleInput(e: Event) {
     const target = e.target as HTMLTextAreaElement;
@@ -11,7 +15,7 @@
   }
 
   function handleReset() {
-    promptValue = mockSettings.systemPrompt;
+    promptValue = DEFAULT_SYSTEM_PROMPT;
     settingsStore.updateSystemPrompt(promptValue);
   }
 </script>
