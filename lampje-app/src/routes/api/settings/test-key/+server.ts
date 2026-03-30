@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { userSettings } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-import { trackEvent } from '$lib/server/posthog';
 
 export const POST: RequestHandler = async ({ locals }) => {
 	const session = await locals.auth();
@@ -33,8 +32,6 @@ export const POST: RequestHandler = async ({ locals }) => {
 			.update(userSettings)
 			.set({ geminiApiKeyStatus: newStatus, updatedAt: new Date() })
 			.where(eq(userSettings.userId, session.user.id));
-
-		trackEvent(session.user.id, 'api_key_tested', { valid });
 
 		return json({ valid });
 	} catch {

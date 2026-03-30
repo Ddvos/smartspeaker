@@ -1,4 +1,6 @@
 import type { UserSettings } from '$lib/types';
+import posthog from 'posthog-js';
+import { browser } from '$app/environment';
 
 const defaultSettings: UserSettings = {
 	hasGeminiApiKey: false,
@@ -22,6 +24,7 @@ function debouncedSave(updates: Record<string, unknown>) {
 }
 
 async function save(updates: Record<string, unknown>) {
+	const hadKeyBefore = settings.hasGeminiApiKey;
 	saving = true;
 	error = null;
 	try {
@@ -33,6 +36,21 @@ async function save(updates: Record<string, unknown>) {
 		if (!res.ok) throw new Error('Failed to save settings');
 		const data: UserSettings = await res.json();
 		settings = data;
+
+		// Track PostHog events client-side
+		if (browser) {
+			if ('geminiApiKey' in updates && updates.geminiApiKey) {
+				posthog.capture('api_key_saved', {
+					status: hadKeyBefore ? 'updated' : 'new'
+				});
+			}
+			const trackableFields = ['defaultModel', 'defaultVoice', 'defaultSystemPrompt'];
+			for (const field of trackableFields) {
+				if (field in updates) {
+					posthog.capture('settings_changed', { field });
+				}
+			}
+		}
 	} catch (e) {
 		error = e instanceof Error ? e.message : 'Unknown error';
 	} finally {
@@ -83,6 +101,9 @@ export const settingsStore = {
 			const res = await fetch('/api/settings/test-key', { method: 'POST' });
 			if (!res.ok) throw new Error('Failed to test key');
 			const data = await res.json();
+			if (browser) {
+				posthog.capture('api_key_tested', { valid: data.valid });
+			}
 			// Reload settings to get updated status
 			await this.load();
 			return data.valid;
