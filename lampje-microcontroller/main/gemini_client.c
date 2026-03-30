@@ -96,6 +96,18 @@ static void send_setup_message(void)
     cJSON *prebuilt = cJSON_AddObjectToObject(voice_cfg, "prebuiltVoiceConfig");
     cJSON_AddStringToObject(prebuilt, "voiceName", s_config.voice);
 
+    // Configure VAD with low sensitivity to reduce echo false triggers
+    cJSON *rt_input = cJSON_AddObjectToObject(setup, "realtimeInputConfig");
+    cJSON *vad = cJSON_AddObjectToObject(rt_input, "automaticActivityDetection");
+    cJSON_AddStringToObject(vad, "startOfSpeechSensitivity", "START_SENSITIVITY_LOW");
+    cJSON_AddStringToObject(vad, "endOfSpeechSensitivity", "END_SENSITIVITY_LOW");
+    cJSON_AddNumberToObject(vad, "prefixPaddingMs", 20);
+    cJSON_AddNumberToObject(vad, "silenceDurationMs", 500);
+
+    // Enable proactive audio: model can ignore its own echo and irrelevant audio
+    cJSON *proactivity = cJSON_AddObjectToObject(setup, "proactivity");
+    cJSON_AddBoolToObject(proactivity, "proactiveAudio", 1);
+
     if (s_config.system_prompt[0] != '\0') {
         cJSON *sys = cJSON_AddObjectToObject(setup, "systemInstruction");
         cJSON *parts = cJSON_AddArrayToObject(sys, "parts");
@@ -393,6 +405,28 @@ static void audio_send_task(void *arg)
         if (stereo_samples > MONO_CHUNK_SAMPLES) stereo_samples = MONO_CHUNK_SAMPLES;
         stereo_to_mono((const int16_t *)stereo_buf, mono_buf, stereo_samples);
 
+        // Calculate peak amplitude
+        int16_t peak = 0;
+        for (int i = 0; i < stereo_samples; i++) {
+            int16_t v = mono_buf[i] < 0 ? -mono_buf[i] : mono_buf[i];
+            if (v > peak) peak = v;
+        }
+
+        // Debug: log audio level every ~1s
+        static int audio_log_cnt = 0;
+        if (audio_log_cnt++ % 10 == 0) {
+            ESP_LOGI(TAG, "Audio: peak=%d samples=%d responding=%d",
+                     peak, stereo_samples,
+                     (xEventGroupGetBits(s_events) & BIT_RESPONSE_ACTIVE) ? 1 : 0);
+        }
+
+        // Echo gate: while Gemini is speaking, only send audio if loud enough
+        // to be a real person (not just speaker echo picked up by mic).
+        // This preserves barge-in for deliberate speech while filtering echo.
+        if ((xEventGroupGetBits(s_events) & BIT_RESPONSE_ACTIVE) && peak < 6000) {
+            continue;
+        }
+
         // Base64 encode the mono PCM
         size_t b64_len = 0;
         int ret = mbedtls_base64_encode((uint8_t *)b64_buf, B64_CHUNK_SIZE, &b64_len,
@@ -402,17 +436,6 @@ static void audio_send_task(void *arg)
             continue;
         }
         b64_buf[b64_len] = '\0';
-
-        // Debug: log audio level every ~1s
-        static int audio_log_cnt = 0;
-        if (audio_log_cnt++ % 10 == 0) {
-            int16_t peak = 0;
-            for (int i = 0; i < stereo_samples; i++) {
-                int16_t v = mono_buf[i] < 0 ? -mono_buf[i] : mono_buf[i];
-                if (v > peak) peak = v;
-            }
-            ESP_LOGI(TAG, "Audio: peak=%d samples=%d", peak, stereo_samples);
-        }
 
         // Build JSON message using snprintf for performance (hot path)
         int msg_len = snprintf(send_buf, SEND_BUF_SIZE,
@@ -576,7 +599,17 @@ esp_err_t gemini_client_end_turn(void)
 {
     // Stop conversation mode entirely
     s_conversation_active = false;
-    xEventGroupClearBits(s_events, BIT_TURN_ACTIVE);
+    xEventGroupClearBits(s_events, BIT_TURN_ACTIVE | BIT_RESPONSE_ACTIVE);
+
+    // Flush playback buffer to stop audio immediately
+    if (s_play_ringbuf) {
+        void *item;
+        size_t sz;
+        while ((item = xRingbufferReceive(s_play_ringbuf, &sz, 0)) != NULL) {
+            vRingbufferReturnItem(s_play_ringbuf, item);
+        }
+    }
+
     set_state(GEMINI_STATE_READY);
     ESP_LOGI(TAG, "Conversation stopped");
 

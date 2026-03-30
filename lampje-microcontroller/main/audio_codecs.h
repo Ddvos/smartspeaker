@@ -36,7 +36,3 @@ esp_err_t audio_codecs_set_mic_gain(int gain_db);
 // Play a 440Hz test tone for ~2 seconds to verify speaker works
 esp_err_t audio_codecs_play_test_tone(void);
 
-// Play/stop embedded test music (canon.pcm) in background
-void audio_codecs_play_music(void);
-void audio_codecs_stop_music(void);
-bool audio_codecs_is_playing_music(void);

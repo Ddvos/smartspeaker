@@ -11,7 +11,6 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "lvgl.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -91,8 +90,6 @@ static int64_t s_token_fetched_epoch = 0;
 static volatile gemini_state_t s_pending_ui_state = GEMINI_STATE_IDLE;
 static volatile bool s_ui_update_pending = false;
 
-static void register_touch_handler(void);
-
 // Called from WebSocket task — do NOT call LVGL here (not thread-safe)
 static void on_gemini_state_change(gemini_state_t state)
 {
@@ -128,37 +125,36 @@ static void process_ui_updates(void)
     switch (state) {
         case GEMINI_STATE_READY:
             display_ui_show_voice_idle();
-            register_touch_handler();
             break;
         case GEMINI_STATE_LISTENING:
             display_ui_show_voice_listening();
-            register_touch_handler();
             break;
         case GEMINI_STATE_PROCESSING:
             display_ui_show_voice_thinking();
-            register_touch_handler();
             break;
         case GEMINI_STATE_SPEAKING:
             display_ui_show_voice_speaking();
-            register_touch_handler();
             break;
         default:
             break;
     }
 }
 
-static void touch_event_cb(lv_event_t *e)
+static void on_voice_start(void)
 {
     gemini_state_t gs = gemini_client_get_state();
-    ESP_LOGI(TAG, "Touch! Gemini state=%d", gs);
-
+    ESP_LOGI(TAG, "Start pressed, state=%d", gs);
     if (gs == GEMINI_STATE_READY) {
-        // Start conversation (tap once to begin)
-        audio_codecs_stop_music();
         gemini_client_start_turn();
-    } else if (gs == GEMINI_STATE_LISTENING || gs == GEMINI_STATE_SPEAKING ||
-               gs == GEMINI_STATE_PROCESSING) {
-        // Stop conversation (tap again to stop, from any active state)
+    }
+}
+
+static void on_voice_stop(void)
+{
+    gemini_state_t gs = gemini_client_get_state();
+    ESP_LOGI(TAG, "Stop pressed, state=%d", gs);
+    if (gs == GEMINI_STATE_LISTENING || gs == GEMINI_STATE_SPEAKING ||
+        gs == GEMINI_STATE_PROCESSING) {
         gemini_client_end_turn();
     }
 }
@@ -197,16 +193,6 @@ static esp_err_t connect_gemini(void)
     return ESP_OK;
 }
 
-static void register_touch_handler(void)
-{
-    // Get current screen and register touch callback
-    lv_obj_t *scr = lv_screen_active();
-    if (scr) {
-        lv_obj_add_event_cb(scr, touch_event_cb, LV_EVENT_CLICKED, NULL);
-        lv_obj_add_flag(scr, LV_OBJ_FLAG_CLICKABLE);
-    }
-}
-
 static void heartbeat_loop(void)
 {
     s_state = DEVICE_STATE_RUNNING;
@@ -218,12 +204,14 @@ static void heartbeat_loop(void)
         audio_codecs_set_volume(config.speaker_volume);
     }
 
+    // Set voice button callbacks
+    display_ui_set_voice_callbacks(on_voice_start, on_voice_stop);
+
     // Connect to Gemini
     if (connect_gemini() != ESP_OK) {
         ESP_LOGW(TAG, "Gemini connect failed, will retry");
         display_ui_show_status("Lampje", true, wifi_manager_get_rssi());
     }
-    register_touch_handler();
 
     int heartbeat_counter = 0;
     while (1) {
@@ -267,7 +255,7 @@ static void heartbeat_loop(void)
         if (!s_gemini_connected) {
             ESP_LOGI(TAG, "Retrying Gemini connection...");
             if (connect_gemini() == ESP_OK) {
-                register_touch_handler();
+                // Callbacks already set, buttons will work on next UI update
             }
         }
 
@@ -277,7 +265,7 @@ static void heartbeat_loop(void)
             ESP_LOGI(TAG, "Refreshing Gemini token...");
             gemini_client_disconnect();
             if (connect_gemini() == ESP_OK) {
-                register_touch_handler();
+                // Callbacks already set, buttons will work on next UI update
             }
         }
     }

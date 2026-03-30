@@ -274,52 +274,6 @@ static esp_err_t codec_init(void)
     return ESP_OK;
 }
 
-// ── Embedded test music ───────────────────────────────────────
-extern const uint8_t canon_pcm_start[] asm("_binary_coldplay_pcm_start");
-extern const uint8_t canon_pcm_end[]   asm("_binary_coldplay_pcm_end");
-
-static TaskHandle_t s_music_task = NULL;
-static volatile bool s_music_playing = false;
-
-static void music_task(void *arg)
-{
-    ESP_LOGI(TAG, "Music playback started (%d bytes)", (int)(canon_pcm_end - canon_pcm_start));
-    const uint8_t *ptr = canon_pcm_start;
-    const int chunk = 4096;
-
-    while (s_music_playing && ptr < canon_pcm_end) {
-        int remaining = canon_pcm_end - ptr;
-        int to_write = remaining < chunk ? remaining : chunk;
-        size_t written = 0;
-        i2s_channel_write(s_tx_handle, ptr, to_write, &written, portMAX_DELAY);
-        ptr += to_write;
-
-        if (ptr >= canon_pcm_end) {
-            ptr = canon_pcm_start;  // Loop
-        }
-    }
-    ESP_LOGI(TAG, "Music playback stopped");
-    s_music_task = NULL;
-    vTaskDelete(NULL);
-}
-
-void audio_codecs_play_music(void)
-{
-    if (s_music_playing) return;
-    s_music_playing = true;
-    xTaskCreate(music_task, "music", 4096, NULL, 5, &s_music_task);
-}
-
-void audio_codecs_stop_music(void)
-{
-    s_music_playing = false;
-}
-
-bool audio_codecs_is_playing_music(void)
-{
-    return s_music_playing;
-}
-
 esp_err_t audio_codecs_play_test_tone(void)
 {
     if (!s_tx_handle) return ESP_ERR_INVALID_STATE;

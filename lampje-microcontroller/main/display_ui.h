@@ -9,9 +9,8 @@ esp_err_t display_ui_show_status(const char *device_name, bool connected, int wi
 esp_err_t display_ui_show_wifi_connecting(void);
 esp_err_t display_ui_show_error(const char *message);
 
-// Voice interaction screens (music_cb called when play/pause tapped)
-typedef void (*display_ui_music_cb_t)(void);
-void display_ui_set_music_callback(display_ui_music_cb_t cb);
+typedef void (*display_ui_voice_cb_t)(void);
+void display_ui_set_voice_callbacks(display_ui_voice_cb_t start_cb, display_ui_voice_cb_t stop_cb);
 esp_err_t display_ui_show_voice_idle(void);
 esp_err_t display_ui_show_voice_listening(void);
 esp_err_t display_ui_show_voice_thinking(void);
