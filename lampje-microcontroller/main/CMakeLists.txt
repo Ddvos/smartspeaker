@@ -1,5 +1,4 @@
 idf_component_register(
-    EMBED_FILES "coldplay.pcm"
     SRCS
         "main.c"
         "wifi_manager.c"

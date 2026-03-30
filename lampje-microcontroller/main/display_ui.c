@@ -1,16 +1,17 @@
 #include "display_ui.h"
 #include "display_driver.h"
-#include "audio_codecs.h"
 #include "lvgl.h"
 #include "esp_log.h"
 #include <string.h>
 #include <stdio.h>
 
 static const char *TAG = "display_ui";
-static display_ui_music_cb_t s_music_cb = NULL;
+static display_ui_voice_cb_t s_start_cb = NULL;
+static display_ui_voice_cb_t s_stop_cb = NULL;
 
-void display_ui_set_music_callback(display_ui_music_cb_t cb) {
-    s_music_cb = cb;
+void display_ui_set_voice_callbacks(display_ui_voice_cb_t start_cb, display_ui_voice_cb_t stop_cb) {
+    s_start_cb = start_cb;
+    s_stop_cb = stop_cb;
 }
 
 // Colors matching the Lampje brand
@@ -192,22 +193,74 @@ static void create_voice_orb(lv_obj_t *parent, lv_color_t color, int size)
     lv_obj_set_style_border_color(orb, color, 0);
     lv_obj_set_style_border_opa(orb, LV_OPA_60, 0);
     lv_obj_center(orb);
+    lv_obj_remove_flag(orb, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 }
 
-static lv_obj_t *s_music_btn_label = NULL;
-
-static void music_btn_event_cb(lv_event_t *e)
+static void start_btn_cb(lv_event_t *e)
 {
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code != LV_EVENT_CLICKED) return;
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    ESP_LOGI(TAG, "Start button pressed");
+    if (s_start_cb) s_start_cb();
+}
 
-    if (audio_codecs_is_playing_music()) {
-        audio_codecs_stop_music();
-        if (s_music_btn_label) lv_label_set_text(s_music_btn_label, LV_SYMBOL_PLAY " Test");
+static void stop_btn_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    ESP_LOGI(TAG, "Stop button pressed");
+    if (s_stop_cb) s_stop_cb();
+}
+
+static void create_voice_buttons(lv_obj_t *parent, bool active)
+{
+    // Start button (left)
+    lv_obj_t *start_btn = lv_btn_create(parent);
+    lv_obj_set_size(start_btn, 130, 50);
+    lv_obj_align(start_btn, LV_ALIGN_CENTER, -75, 180);
+    lv_obj_set_style_radius(start_btn, 25, 0);
+    lv_obj_set_style_border_width(start_btn, 1, 0);
+    if (!active) {
+        // Idle: start is highlighted
+        lv_obj_set_style_bg_color(start_btn, COLOR_PRIMARY, 0);
+        lv_obj_set_style_bg_opa(start_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(start_btn, COLOR_PRIMARY, 0);
     } else {
-        audio_codecs_play_music();
-        if (s_music_btn_label) lv_label_set_text(s_music_btn_label, LV_SYMBOL_PAUSE " Stop");
+        // Active: start is dimmed
+        lv_obj_set_style_bg_color(start_btn, COLOR_SURFACE, 0);
+        lv_obj_set_style_bg_opa(start_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(start_btn, COLOR_TEXT_DIM, 0);
     }
+    lv_obj_add_event_cb(start_btn, start_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *start_label = lv_label_create(start_btn);
+    lv_label_set_text(start_label, LV_SYMBOL_PLAY " Start");
+    lv_obj_set_style_text_color(start_label, !active ? COLOR_BG : COLOR_TEXT_DIM, 0);
+    lv_obj_set_style_text_font(start_label, &lv_font_montserrat_16, 0);
+    lv_obj_center(start_label);
+
+    // Stop button (right)
+    lv_obj_t *stop_btn = lv_btn_create(parent);
+    lv_obj_set_size(stop_btn, 130, 50);
+    lv_obj_align(stop_btn, LV_ALIGN_CENTER, 75, 180);
+    lv_obj_set_style_radius(stop_btn, 25, 0);
+    lv_obj_set_style_border_width(stop_btn, 1, 0);
+    if (active) {
+        // Active: stop is highlighted
+        lv_obj_set_style_bg_color(stop_btn, COLOR_ERROR, 0);
+        lv_obj_set_style_bg_opa(stop_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(stop_btn, COLOR_ERROR, 0);
+    } else {
+        // Idle: stop is dimmed
+        lv_obj_set_style_bg_color(stop_btn, COLOR_SURFACE, 0);
+        lv_obj_set_style_bg_opa(stop_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(stop_btn, COLOR_TEXT_DIM, 0);
+    }
+    lv_obj_add_event_cb(stop_btn, stop_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *stop_label = lv_label_create(stop_btn);
+    lv_label_set_text(stop_label, LV_SYMBOL_STOP " Stop");
+    lv_obj_set_style_text_color(stop_label, active ? COLOR_TEXT : COLOR_TEXT_DIM, 0);
+    lv_obj_set_style_text_font(stop_label, &lv_font_montserrat_16, 0);
+    lv_obj_center(stop_label);
 }
 
 esp_err_t display_ui_show_voice_idle(void)
@@ -217,28 +270,12 @@ esp_err_t display_ui_show_voice_idle(void)
     create_voice_orb(s_current_screen, COLOR_PRIMARY, 200);
 
     lv_obj_t *label = lv_label_create(s_current_screen);
-    lv_label_set_text(label, "Tik om te praten");
+    lv_label_set_text(label, "Klaar om te praten");
     lv_obj_set_style_text_color(label, COLOR_TEXT_DIM, 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 140);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 130);
 
-    // Play/pause test music button
-    lv_obj_t *btn = lv_btn_create(s_current_screen);
-    lv_obj_set_size(btn, 160, 50);
-    lv_obj_align(btn, LV_ALIGN_CENTER, 0, 210);
-    lv_obj_set_style_bg_color(btn, COLOR_SURFACE, 0);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(btn, 25, 0);
-    lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_border_color(btn, COLOR_TEXT_DIM, 0);
-    lv_obj_add_event_cb(btn, music_btn_event_cb, LV_EVENT_CLICKED, NULL);
-
-    s_music_btn_label = lv_label_create(btn);
-    lv_label_set_text(s_music_btn_label,
-                      audio_codecs_is_playing_music() ? LV_SYMBOL_PAUSE " Stop" : LV_SYMBOL_PLAY " Test");
-    lv_obj_set_style_text_color(s_music_btn_label, COLOR_TEXT, 0);
-    lv_obj_set_style_text_font(s_music_btn_label, &lv_font_montserrat_16, 0);
-    lv_obj_center(s_music_btn_label);
+    create_voice_buttons(s_current_screen, false);
 
     return ESP_OK;
 }
@@ -257,6 +294,7 @@ esp_err_t display_ui_show_voice_listening(void)
     lv_obj_set_style_bg_opa(inner, LV_OPA_50, 0);
     lv_obj_set_style_border_width(inner, 0, 0);
     lv_obj_center(inner);
+    lv_obj_remove_flag(inner, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 
     // Pulse animation
     lv_anim_t a;
@@ -277,7 +315,9 @@ esp_err_t display_ui_show_voice_listening(void)
     lv_label_set_text(label, "Luistert...");
     lv_obj_set_style_text_color(label, COLOR_LISTENING, 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 140);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 130);
+
+    create_voice_buttons(s_current_screen, true);
 
     return ESP_OK;
 }
@@ -292,12 +332,15 @@ esp_err_t display_ui_show_voice_thinking(void)
     lv_obj_set_size(spinner, 80, 80);
     lv_obj_center(spinner);
     lv_spinner_set_anim_params(spinner, 1200, 200);
+    lv_obj_remove_flag(spinner, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *label = lv_label_create(s_current_screen);
     lv_label_set_text(label, "Denkt na...");
     lv_obj_set_style_text_color(label, COLOR_THINKING, 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 140);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 130);
+
+    create_voice_buttons(s_current_screen, true);
 
     return ESP_OK;
 }
@@ -316,6 +359,7 @@ esp_err_t display_ui_show_voice_speaking(void)
     lv_obj_set_style_bg_opa(inner, LV_OPA_40, 0);
     lv_obj_set_style_border_width(inner, 0, 0);
     lv_obj_center(inner);
+    lv_obj_remove_flag(inner, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
 
     lv_anim_t a;
     lv_anim_init(&a);
@@ -335,7 +379,9 @@ esp_err_t display_ui_show_voice_speaking(void)
     lv_label_set_text(label, "Spreekt...");
     lv_obj_set_style_text_color(label, COLOR_SPEAKING, 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 140);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 130);
+
+    create_voice_buttons(s_current_screen, true);
 
     return ESP_OK;
 }
