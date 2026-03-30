@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { userSettings } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-import { trackEvent } from '$lib/server/posthog';
 import { voices } from '$lib/data/settings-constants';
 
 const ALLOWED_MODELS = ['gemini-2.0-flash-live'];
@@ -93,20 +92,6 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		.set(updates)
 		.where(eq(userSettings.userId, session.user.id))
 		.returning();
-
-	// Track PostHog events
-	if ('geminiApiKey' in body && body.geminiApiKey) {
-		trackEvent(session.user.id, 'api_key_saved', {
-			status: settings.geminiApiKey ? 'updated' : 'new'
-		});
-	}
-
-	const changedFields = Object.keys(updates).filter(
-		(k) => k !== 'updatedAt' && k !== 'geminiApiKey' && k !== 'geminiApiKeyStatus'
-	);
-	for (const field of changedFields) {
-		trackEvent(session.user.id, 'settings_changed', { field });
-	}
 
 	return json(formatSettings(updated ?? settings));
 };
