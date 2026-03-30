@@ -54,6 +54,28 @@ export const verificationTokens = pgTable(
 	(vt) => [primaryKey({ columns: [vt.identifier, vt.token] })]
 );
 
+// ── User settings ─────────────────────────────────────────────
+
+export const userSettings = pgTable('user_settings', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	userId: text('user_id')
+		.unique()
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	geminiApiKey: text('gemini_api_key'),
+	geminiApiKeyStatus: text('gemini_api_key_status')
+		.$type<'untested' | 'valid' | 'invalid'>()
+		.default('untested')
+		.notNull(),
+	defaultModel: text('default_model').default('gemini-2.0-flash-live').notNull(),
+	defaultVoice: text('default_voice').default('puck').notNull(),
+	defaultSystemPrompt: text('default_system_prompt'),
+	createdAt: timestamp('created_at', { mode: 'date' }).defaultNow(),
+	updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow()
+});
+
 // ── Device tables ──────────────────────────────────────────────
 
 export const devices = pgTable('device', {
@@ -95,7 +117,7 @@ export const deviceConfigs = pgTable('device_config', {
 	displayBrightness: integer('display_brightness').default(80).notNull(),
 	voice: text('voice').default('puck').notNull(),
 	systemPrompt: text('system_prompt'),
-	geminiModel: text('gemini_model').default('gemini-3.1-flash-live-preview').notNull(),
+	geminiModel: text('gemini_model').default('gemini-2.0-flash-live').notNull(),
 	sttProvider: text('stt_provider').default('whisper').notNull(),
 	ttsProvider: text('tts_provider').default('elevenlabs').notNull(),
 	updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow()

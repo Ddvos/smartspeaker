@@ -1,8 +1,10 @@
-export interface ApiKeyConfig {
-	provider: string;
-	label: string;
-	key: string;
-	status: 'connected' | 'error' | 'untested';
+export interface UserSettings {
+	hasGeminiApiKey: boolean;
+	geminiApiKeyMasked: string;
+	geminiApiKeyStatus: 'untested' | 'valid' | 'invalid';
+	defaultModel: string;
+	defaultVoice: string;
+	defaultSystemPrompt: string;
 }
 
 export interface AiModel {
@@ -17,12 +19,4 @@ export interface VoiceOption {
 	id: string;
 	name: string;
 	style: string;
-}
-
-export interface AppSettings {
-	apiKeys: ApiKeyConfig[];
-	selectedModel: string;
-	selectedVoice: string;
-	personality: number; // 0 (zakelijk) to 100 (speels)
-	systemPrompt: string;
 }

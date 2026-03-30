@@ -1,14 +1,14 @@
 <script lang="ts">
   import { settingsStore } from '$lib/stores/settings.svelte';
-  import { mockVoices } from '$lib/data/mock-settings';
+  import { voices } from '$lib/data/settings-constants';
 </script>
 
 <div>
   <h2 class="font-display text-lg text-on-bg">Stem selectie</h2>
 
   <div class="grid grid-cols-2 gap-3 mt-4">
-    {#each mockVoices as voice}
-      {@const isSelected = settingsStore.current.selectedVoice === voice.id}
+    {#each voices as voice}
+      {@const isSelected = settingsStore.current.defaultVoice === voice.id}
       <button
         type="button"
         class="p-4 rounded-xl transition-all duration-150 text-left cursor-pointer {isSelected

@@ -23,6 +23,8 @@ export const mockDevice: Device = {
 		speakerVolume: 65,
 		displayBrightness: 80,
 		voice: 'puck',
+		systemPrompt: null,
+		geminiModel: 'gemini-2.0-flash-live',
 		sttProvider: 'whisper',
 		ttsProvider: 'elevenlabs'
 	}
