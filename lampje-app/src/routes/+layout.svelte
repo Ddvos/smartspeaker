@@ -4,6 +4,7 @@
   import { page } from '$app/state';
   import { browser } from '$app/environment';
   import posthog from 'posthog-js';
+  import CookieBanner from '$lib/components/ui/CookieBanner.svelte';
 
   let { children } = $props();
 
@@ -20,3 +21,4 @@
 </svelte:head>
 
 {@render children()}
+<CookieBanner />
