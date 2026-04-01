@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { Download, Trash2 } from 'lucide-svelte';
+  import { Download, Trash2, Cookie } from 'lucide-svelte';
   import { toastStore } from '$lib/stores/toast.svelte';
+  import { consentStore } from '$lib/stores/consent.svelte';
   import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 
   let deleteConversationsOpen = $state(false);
@@ -25,6 +26,45 @@
   <h2 class="font-display text-lg text-on-bg">Data & Privacy</h2>
 
   <div class="space-y-3 mt-4">
+    <div class="bg-surface-1 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <Cookie size={18} class="text-on-bg-dim shrink-0" />
+        <div>
+          <span class="font-body text-sm text-on-bg">Analytics cookies</span>
+          <p class="font-body text-xs text-on-bg-dim mt-0.5">
+            {#if consentStore.status === 'granted'}
+              Actief — we verzamelen analytics data
+            {:else}
+              Inactief — alleen anonieme data
+            {/if}
+          </p>
+        </div>
+      </div>
+      {#if consentStore.status === 'granted'}
+        <button
+          type="button"
+          class="cursor-pointer rounded-lg bg-surface-2 px-3 py-1.5 font-body text-xs text-on-bg-dim transition-colors duration-150 hover:bg-surface-bright"
+          onclick={() => {
+            consentStore.withdraw();
+            toastStore.success('Analytics cookies ingetrokken');
+          }}
+        >
+          Intrekken
+        </button>
+      {:else}
+        <button
+          type="button"
+          class="cursor-pointer rounded-lg bg-primary/15 px-3 py-1.5 font-body text-xs text-primary transition-colors duration-150 hover:bg-primary/25"
+          onclick={() => {
+            consentStore.accept();
+            toastStore.success('Analytics cookies geaccepteerd');
+          }}
+        >
+          Accepteren
+        </button>
+      {/if}
+    </div>
+
     <button
       type="button"
       class="bg-surface-1 hover:bg-surface-bright rounded-xl px-4 py-3 w-full text-left flex items-center gap-3 cursor-pointer transition-colors duration-150"
