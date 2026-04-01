@@ -1,5 +1,8 @@
 <script lang="ts">
   import { Mic, Loader, Volume2 } from 'lucide-svelte';
+  import posthog from 'posthog-js';
+  import { browser } from '$app/environment';
+  import { experimentStore } from '$lib/stores/experiment.svelte';
 
   let {
     state = 'idle',
@@ -10,6 +13,8 @@
     size?: number;
     onclick?: () => void;
   } = $props();
+
+  const hoverVariant = $derived(experimentStore.micHoverVariant);
 
   const innerSize = $derived(size - 6);
 
@@ -46,6 +51,24 @@
   );
 
   const innerRounding = $derived(state === 'thinking' ? 'rounded-2xl' : 'rounded-full');
+
+  const hoverGlow = $derived(
+    state !== 'idle'
+      ? 'transparent'
+      : hoverVariant === 'test'
+        ? 'rgba(166, 140, 255, 0.7)'
+        : 'rgba(255, 117, 32, 0.7)'
+  );
+
+  function handleClick() {
+    if (browser) {
+      posthog.capture('mic_button_clicked', {
+        variant: hoverVariant ?? 'unknown',
+        orb_location: size >= 100 ? 'voicelab' : size >= 56 ? 'header' : 'sidebar'
+      });
+    }
+    onclick?.();
+  }
 </script>
 
 <style>
@@ -59,6 +82,10 @@
       transform: scale(1.04);
       box-shadow: 0 0 48px rgba(166, 140, 255, 0.4);
     }
+  }
+
+  .orb-btn:hover {
+    box-shadow: 0 0 32px 8px var(--hover-glow);
   }
 
   .spin {
@@ -77,9 +104,9 @@
 
 <button
   type="button"
-  class="relative flex cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-dim transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background {shadowClass}"
-  style="width: {size}px; height: {size}px; {outerAnimation}"
-  onclick={onclick}
+  class="orb-btn relative flex cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-dim transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background {shadowClass}"
+  style="width: {size}px; height: {size}px; --hover-glow: {hoverGlow}; {outerAnimation}"
+  onclick={handleClick}
   aria-label={state === 'idle'
     ? 'Microfoon activeren'
     : state === 'listening'

@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { devices, deviceConfigs } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
+import { log } from '$lib/server/logger';
 
 export const PUT: RequestHandler = async ({ params, request, locals }) => {
 	const session = await locals.auth();
@@ -18,9 +19,11 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		.limit(1);
 
 	if (!device) {
+		log('warn', 'Device config update failed: device not found', { deviceId: params.id, userId: session.user.id });
 		return json({ error: 'Device not found' }, { status: 404 });
 	}
 	if (device.userId !== session.user.id) {
+		log('warn', 'Device config update forbidden: not owner', { deviceId: params.id, userId: session.user.id });
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
@@ -53,8 +56,15 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 		.returning();
 
 	if (!updated) {
+		log('error', 'Device config update failed: config row not found', { deviceId: params.id });
 		return json({ error: 'Config not found' }, { status: 404 });
 	}
+
+	log('info', 'Device config updated', {
+		deviceId: params.id,
+		userId: session.user.id,
+		fieldsUpdated: Object.keys(updates).filter((k) => k !== 'updatedAt').join(', ')
+	});
 
 	return json({
 		ledColors: updated.ledColors,

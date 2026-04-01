@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Cookie } from 'lucide-svelte';
+  import { browser } from '$app/environment';
   import { consentStore } from '$lib/stores/consent.svelte';
 </script>
 
@@ -9,7 +10,7 @@
   }
 </style>
 
-{#if consentStore.status === 'pending'}
+{#if browser && consentStore.status === 'pending'}
   <div class="fixed inset-x-0 bottom-0 z-50 flex justify-center p-4">
     <div
       class="banner-enter flex w-full max-w-lg flex-col gap-4 rounded-xl bg-surface-1/90 p-5 shadow-glow-sm backdrop-blur-xl"

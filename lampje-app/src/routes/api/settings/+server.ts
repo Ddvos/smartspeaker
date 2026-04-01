@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { userSettings } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 import { voices } from '$lib/data/settings-constants';
+import { log } from '$lib/server/logger';
 
 const ALLOWED_MODELS = ['gemini-2.0-flash-live'];
 const ALLOWED_VOICES = voices.map((v) => v.id);
@@ -33,10 +34,9 @@ async function getOrCreateSettings(userId: string) {
 
 	if (existing) return existing;
 
-	const [created] = await db
-		.insert(userSettings)
-		.values({ userId })
-		.returning();
+	log('info', 'Created default settings for new user', { userId });
+
+	const [created] = await db.insert(userSettings).values({ userId }).returning();
 
 	return created;
 }
@@ -65,9 +65,11 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 			if (body.geminiApiKey === '') {
 				updates.geminiApiKey = null;
 				updates.geminiApiKeyStatus = 'untested';
+				log('info', 'Gemini API key removed', { userId: session.user.id });
 			} else {
 				updates.geminiApiKey = body.geminiApiKey;
 				updates.geminiApiKeyStatus = 'untested';
+				log('info', 'Gemini API key updated', { userId: session.user.id });
 			}
 		}
 	}
@@ -92,6 +94,16 @@ export const PUT: RequestHandler = async ({ request, locals }) => {
 		.set(updates)
 		.where(eq(userSettings.userId, session.user.id))
 		.returning();
+
+	const fieldsUpdated = Object.keys(updates).filter(
+		(k) => k !== 'updatedAt' && k !== 'geminiApiKey'
+	);
+	if (fieldsUpdated.length > 0) {
+		log('info', 'User settings updated', {
+			userId: session.user.id,
+			fieldsUpdated: fieldsUpdated.join(', ')
+		});
+	}
 
 	return json(formatSettings(updated ?? settings));
 };
